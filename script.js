@@ -1,51 +1,32 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+// --- Configurable tuning values (edit these)
+const GRAVITY = 0.34;      // lower = slower falling
+const LIFT = -6.5;         // smaller magnitude = softer jump
+const FLAP_DAMPING = 0.92; // velocity damping for smoother motion (0.9-0.98)
+const MAX_FALL_SPEED = 8;  // cap maximum downward speed
+const PIPE_SPEED = 1.6;    // pipe horizontal speed (lower = slower obstacles)
+const PIPE_SPAWN_FRAMES = 110; // how often pipes spawn (larger = fewer)
+const SCORE_INTERVAL = 110; // how many frames per score increment
 
-// 🖼️ Load your photo
-const photo = new Image();
-photo.src = "friend.png";
-
-// 🎵 Load sounds
-const flapSound = new Audio("flap.mp3");
-const hitSound = new Audio("hit.mp3");
-
+// Bird object (use these constants)
 let bird = {
   x: 50,
   y: 150,
   width: 40,
   height: 40,
-  gravity: 0.6,
-  lift: -10,
+  gravity: GRAVITY,
+  lift: LIFT,
   velocity: 0
 };
 
+// pipes and game state
 let pipes = [];
 let score = 0;
 let frames = 0;
 let gameStarted = false;
 
-// 🐦 Draw photo
-function drawBird() {
-  ctx.drawImage(photo, bird.x, bird.y, bird.width, bird.height);
-}
-
-// 🌳 Draw pipes
-function drawPipes() {
-  ctx.fillStyle = "green";
-  for (let pipe of pipes) {
-    ctx.fillRect(pipe.x, 0, pipe.width, pipe.top);
-    ctx.fillRect(
-      pipe.x,
-      canvas.height - pipe.bottom,
-      pipe.width,
-      pipe.bottom
-    );
-  }
-}
-
-// 🔄 Update pipes
+// updatePipes uses the PIPE_SPEED and PIPE_SPAWN_FRAMES
 function updatePipes() {
-  if (frames % 90 === 0) {
+  if (frames % PIPE_SPAWN_FRAMES === 0) {
     let top = Math.random() * 200 + 50;
     let gap = 140;
     pipes.push({
@@ -57,46 +38,21 @@ function updatePipes() {
   }
 
   for (let i = pipes.length - 1; i >= 0; i--) {
-    pipes[i].x -= 2;
+    pipes[i].x -= PIPE_SPEED;
     if (pipes[i].x + pipes[i].width < 0) pipes.splice(i, 1);
   }
 }
 
-// 💥 Check collision
-function checkCollision() {
-  for (let pipe of pipes) {
-    if (
-      bird.x + bird.width > pipe.x &&
-      bird.x < pipe.x + pipe.width &&
-      (bird.y < pipe.top ||
-        bird.y + bird.height > canvas.height - pipe.bottom)
-    ) {
-      hitSound.play(); // 💥 play hit sound
-      resetGame();
-    }
-  }
-
-  if (bird.y + bird.height > canvas.height || bird.y < 0) {
-    hitSound.play(); // 💥 play hit sound
-    resetGame();
-  }
-}
-
-function resetGame() {
-  alert("Game Over 😭 Score: " + score);
-  document.location.reload();
-}
-
-function drawScore() {
-  ctx.fillStyle = "black";
-  ctx.font = "20px Arial";
-  ctx.fillText("Score: " + score, 10, 30);
-}
-
+// Main game loop: apply damping, cap fall speed
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Physics
   bird.velocity += bird.gravity;
+  // apply damping for smoother motion (so rapid velocity spikes feel softer)
+  bird.velocity *= FLAP_DAMPING;
+  // cap downward speed to avoid very fast falling
+  if (bird.velocity > MAX_FALL_SPEED) bird.velocity = MAX_FALL_SPEED;
   bird.y += bird.velocity;
 
   updatePipes();
@@ -106,28 +62,21 @@ function gameLoop() {
   checkCollision();
 
   frames++;
-  if (frames % 90 === 0) score++;
+  if (frames % SCORE_INTERVAL === 0) score++;
 
   requestAnimationFrame(gameLoop);
 }
 
-// 🕹️ Controls
+// startGame / flap handler: use bird.lift (smaller lift now)
 function startGame() {
   if (!gameStarted) {
     gameStarted = true;
     gameLoop();
   }
   bird.velocity = bird.lift;
-  flapSound.currentTime = 0; // rewind sound if pressed fast
-  flapSound.play(); // 🐦 play flap sound
+  // optional: restart sound rewinding if you added sounds
+  if (typeof flapSound !== "undefined") {
+    flapSound.currentTime = 0;
+    flapSound.play();
+  }
 }
-
-document.addEventListener("keydown", startGame);
-document.addEventListener("touchstart", startGame);
-
-// 🖼️ Show message before start
-photo.onload = () => {
-  ctx.fillStyle = "black";
-  ctx.font = "24px Arial";
-  ctx.fillText("Press any key to start!", 80, 300);
-};
